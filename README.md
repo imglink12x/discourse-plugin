@@ -1,223 +1,107 @@
-# ImgLink - Fast Image Hosting Platform
+# ImgLink Plugin for Discourse
 
-A high-performance image hosting platform built with Node.js, Next.js, and Cloudflare R2. Upload, share, and embed images instantly.
+Official ImgLink integration for Discourse with reliable media uploads, scoped API key support, retry handling, and admin diagnostics.
+
+## Summary
+
+This plugin connects Discourse to ImgLink so communities can upload images from posting workflows and insert direct/viewer links safely and consistently.
 
 ## Features
 
-- **Instant uploads** - drag & drop, paste from clipboard, multi-file
-- **Anonymous & authenticated** uploads
-- **Auto-processing** - metadata stripping, compression, thumbnail generation
-- **Direct links, embeds** - Markdown, HTML, BBCode
-- **Albums / galleries** - organize images into collections
-- **User dashboard** - manage uploads, albums, API keys
-- **Admin panel** - full moderation, user management, analytics, IP banning
-- **Developer API** - upload and manage via API keys
-- **Dark mode** - clean, modern, responsive UI
-- **CDN delivery** - Cloudflare R2 + CDN for global performance
-- **Docker ready** - single command deployment
+- Upload images from Discourse posting workflows
+- Return direct CDN links and viewer links
+- Scoped API key authentication (security-first)
+- Retry + idempotency behavior for unstable networks
+- Admin diagnostics for auth/upload/delete validation
+- Structured logging for easier troubleshooting
 
-## Tech Stack
+## Compatibility
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Node.js + Fastify |
-| Frontend | Next.js 14 + TailwindCSS |
-| Database | PostgreSQL |
-| Cache/Queue | Redis + BullMQ |
-| Storage | Cloudflare R2 (S3-compatible) |
-| Image Processing | Sharp |
+- Discourse 2.8+ (update if your support range differs)
+- Self-hosted Discourse deployments
 
-## Quick Start
+## Repository
 
-### Prerequisites
+https://github.com/imglink12x/discourse-plugin
 
-- Docker & Docker Compose
-- Cloudflare R2 bucket with credentials
+## Installation
 
-### 1. Clone and configure
+1. SSH into your Discourse host.
+2. Add the plugin to `containers/app.yml` under `hooks > after_code`:
+
+```yaml
+hooks:
+  after_code:
+    - exec:
+        cd: $home/plugins
+        cmd:
+          - git clone https://github.com/imglink12x/discourse-plugin.git
+```
+
+3. Rebuild Discourse:
 
 ```bash
-cp .env.example .env
-# Edit .env with your R2 credentials and JWT secret
+./launcher rebuild app
 ```
 
-### 2. Start with Docker Compose
+4. Open Discourse Admin and configure plugin settings.
 
-```bash
-docker compose up -d
-```
+## Configuration
 
-This starts PostgreSQL, Redis, the backend API, image processing worker, and the frontend.
+Navigate to:
 
-### 3. Access
+**Admin → Settings → Plugins → ImgLink**
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001
-- **Admin login**: username `admin`, password `admin`
+### Required setup
 
-## Local Development (without Docker)
+1. Create an ImgLink API key in your ImgLink account.
+2. Use minimum required scopes:
+   - `upload:create`
+   - `image:delete` (optional; only if delete workflows are enabled)
+3. Set your API key in `imglink_api_key`.
+4. Save settings and run diagnostics.
 
-### Prerequisites
+## Settings
 
-- Node.js 20+
-- PostgreSQL running locally
-- Redis running locally
+| Name | Description |
+|---|---|
+| `imglink_api_key` | ImgLink API key for authenticated upload requests |
+| `imglink_api_endpoint` | ImgLink API base URL (default: `https://imglink.cc/api/v1`) |
+| `imglink_max_retries` | Maximum retry attempts for failed uploads |
+| `imglink_retry_delay_ms` | Delay between retries (milliseconds) |
+| `imglink_timeout_ms` | Request timeout per upload (milliseconds) |
+| `imglink_enable_diagnostics` | Enables admin-side diagnostics tools |
+| `imglink_log_level` | Plugin logging verbosity |
 
-### Backend
+## Security
 
-```bash
-cd backend
-npm install
-npm run migrate
-npm run seed
-npm run dev        # API server on :3001
-npm run worker     # Image processing worker (separate terminal)
-```
+- Use scoped API keys only
+- Rotate keys regularly
+- Never commit API keys to source control
+- Restrict plugin settings to trusted admins
 
-### Frontend
+## Troubleshooting
 
-```bash
-cd frontend
-npm install
-npm run dev        # Next.js on :3000
-```
+- Verify API key validity and scopes
+- Confirm API endpoint reachability from the Discourse server
+- Run plugin diagnostics from admin settings
+- Check Discourse logs for auth/upload errors
 
-## Environment Variables
+## Contributing
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection string |
-| `R2_ENDPOINT` | Cloudflare R2 S3-compatible endpoint |
-| `R2_ACCESS_KEY` | R2 access key ID |
-| `R2_SECRET_KEY` | R2 secret access key |
-| `R2_BUCKET_NAME` | R2 bucket name |
-| `JWT_SECRET` | Secret for JWT token signing |
-| `CDN_URL` | Base URL for image delivery |
-| `FRONTEND_URL` | Frontend URL for CORS and link generation |
-| `MAX_FILE_SIZE` | Max upload size in bytes (default: 20MB) |
+Issues and pull requests are welcome.
 
-## API Documentation
-
-### Authentication
-
-All authenticated endpoints use Bearer token:
-```
-Authorization: Bearer <jwt_token>
-```
-
-API key endpoints use:
-```
-X-API-Key: <api_key>
-```
-
-### Endpoints
-
-#### Upload
-
-```
-POST /api/upload
-Content-Type: multipart/form-data
-
-Body: file (one or more image files)
-
-Response:
-{
-  "images": [
-    {
-      "id": "abc123",
-      "url": "http://localhost:3001/cdn/abc123.png",
-      "thumbnail": "http://localhost:3001/cdn/thumb/abc123.webp",
-      "viewer": "http://localhost:3000/i/abc123",
-      "width": 1920,
-      "height": 1080,
-      "size": 245760,
-      "mime": "image/png"
-    }
-  ]
-}
-```
-
-#### Get Image
-
-```
-GET /api/images/:id
-
-Response: image metadata + embed codes
-```
-
-#### Delete Image
-
-```
-DELETE /api/images/:id
-Authorization: Bearer <token>
-```
-
-#### Auth
-
-```
-POST /api/auth/register   { username, email, password }
-POST /api/auth/login      { login, password }
-GET  /api/auth/me         (authenticated)
-```
-
-#### Albums
-
-```
-GET    /api/albums              (authenticated)
-POST   /api/albums              { title, description, isPublic }
-GET    /api/albums/:id
-PUT    /api/albums/:id          { title, description, isPublic }
-DELETE /api/albums/:id
-POST   /api/albums/:id/images  { imageId }
-DELETE /api/albums/:albumId/images/:imageId
-```
-
-### Rate Limits
-
-- Anonymous: 10 uploads/hour
-- Authenticated: 100 uploads/hour
-- General API: 200 requests/minute
-
-## Architecture
-
-```
-┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Browser   │────▶│  Next.js     │     │  Cloudflare  │
-│             │     │  Frontend    │     │  R2 + CDN    │
-└─────────────┘     └──────┬───────┘     └──────▲───────┘
-                           │                     │
-                    ┌──────▼───────┐     ┌───────┴──────┐
-                    │   Fastify    │────▶│   Worker     │
-                    │   Backend    │     │  (BullMQ)    │
-                    └──────┬───────┘     └──────────────┘
-                           │
-              ┌────────────┼────────────┐
-              ▼            ▼            ▼
-        ┌──────────┐ ┌──────────┐ ┌──────────┐
-        │PostgreSQL│ │  Redis   │ │   R2     │
-        └──────────┘ └──────────┘ └──────────┘
-```
-
-## Storage Structure
-
-Images are stored with hash-sharded paths for optimal distribution:
-
-```
-images/
-  ab/
-    cd/
-      abcdef1234.png          (original)
-      abcdef1234_thumbnail.webp
-      abcdef1234_small.webp
-      abcdef1234_medium.webp
-```
-
-## Supported Formats
-
-- PNG, JPG/JPEG, WebP, GIF, SVG
-- Future: AVIF, HEIC
+When opening an issue, include:
+- Discourse version
+- Plugin version/commit
+- Reproduction steps
+- Relevant logs/error output
 
 ## License
 
 MIT
+
+## Support
+
+- Docs: https://imglink.cc/tools/forum-plugins
+- Issues: https://github.com/imglink12x/discourse-plugin/issues
