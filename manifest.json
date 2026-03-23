@@ -1,0 +1,8 @@
+﻿{
+    "apiBase":  "https://imglink.cc",
+    "platform":  "Discourse",
+    "name":  "ImgLink Discourse",
+    "version":  "0.1.0",
+    "notes":  "Production integration package"
+}
+

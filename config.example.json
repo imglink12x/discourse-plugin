@@ -1,0 +1,6 @@
+﻿{
+    "retries":  3,
+    "timeoutSeconds":  30,
+    "apiBase":  "https://imglink.cc",
+    "apiKey":  "REPLACE_WITH_IMGLINK_API_KEY"
+}
